@@ -4,8 +4,8 @@
 
 {
     "nodes": [
-        {"id": 0, "runtime": 0.31},
-        {"id": 1, "runtime": 0.45},
+        {"id": 0, "runtime": 0.31, "name": "ExtractSGT"},
+        {"id": 1, "runtime": 0.45, "name": "SeismogramSynthesis"},
         ...
     ],
     "edges": [
@@ -17,6 +17,7 @@
 
 说明：
 - runtime 来自 <job runtime="..."> (单位：秒)
+- name 来自 <job name="...">
 - size_bytes = 父节点输出 & 子节点输入的共同文件 size 之和 (单位：字节)
 """
 
@@ -33,12 +34,14 @@ class FileInfo(TypedDict):
 class JobInfo(TypedDict):
     id: int
     runtime: float
+    name: str
     files: dict[str, FileInfo]
 
 
 class NodeInfo(TypedDict):
     id: int
     runtime: float
+    name: str
 
 
 class EdgeInfo(TypedDict):
@@ -94,8 +97,15 @@ def parse_dax(path: str) -> str:
             continue
         if (job_runtime := job.get("runtime")) is None:
             continue
+        if (job_name := job.get("name")) is None:
+            continue
 
-        jobs[job_id] = {"id": int(job_id.replace("ID", "")), "runtime": float(job_runtime), "files": {}}
+        jobs[job_id] = {
+            "id": int(job_id.replace("ID", "")),
+            "runtime": float(job_runtime),
+            "name": job_name,
+            "files": {},
+        }
 
         # 解析文件IO信息
         for uses in job.findall(uses_xpath, ns):
@@ -133,7 +143,10 @@ def parse_dax(path: str) -> str:
 
     # 生成结果
     result: DagInfo = {
-        "nodes": [{"id": job_data["id"], "runtime": job_data["runtime"]} for job_data in jobs.values()],
+        "nodes": [
+            {"id": job_data["id"], "runtime": job_data["runtime"], "name": job_data["name"]}
+            for job_data in jobs.values()
+        ],
         "edges": edges,
     }
 

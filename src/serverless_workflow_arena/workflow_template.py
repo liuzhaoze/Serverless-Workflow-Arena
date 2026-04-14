@@ -23,6 +23,7 @@ class WorkflowTemplate:
 
     memory_reqs: tuple[int, ...]
     parallelisms: tuple[int, ...]
+    names: tuple[str, ...]
     computations: tuple[int, ...]
     edges: tuple[tuple[int, int, int], ...]
 
@@ -70,6 +71,7 @@ class WorkflowTemplate:
         if not (len(nodes) == len(self.memory_reqs) == len(self.parallelisms)):
             raise ValueError("Number of nodes in DAG JSON does not match length of memory_reqs and parallelisms")
 
+        self.names = tuple(node["name"] for node in nodes_sorted)
         self.computations = tuple(
             int(round(n["runtime"] * single_core_speed * p)) for n, p in zip(nodes_sorted, self.parallelisms)
         )

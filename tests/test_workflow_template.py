@@ -37,7 +37,8 @@ class TestWorkflowTemplate:
             assert len(template.computations) > 0
             assert len(template.memory_reqs) > 0
             assert len(template.parallelisms) > 0
-            assert len(template.computations) == len(template.memory_reqs) == len(template.parallelisms)
+            assert len(template.names) > 0
+            assert len(template.computations) == len(template.memory_reqs) == len(template.parallelisms) == len(template.names)
 
             # 验证所有值都是非负数
             assert all(comp >= 0 for comp in template.computations)
@@ -260,6 +261,7 @@ class TestWorkflowTemplate:
             assert len(template.computations) == 0
             assert len(template.memory_reqs) == 0
             assert len(template.parallelisms) == 0
+            assert len(template.names) == 0
             assert len(template.edges) == 0
 
     def test_workflow_template_json_file_format_errors(self, dax_file: Path):

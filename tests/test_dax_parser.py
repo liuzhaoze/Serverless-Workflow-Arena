@@ -22,6 +22,7 @@ class TestCalculateDataTransferSize:
         parent_job: JobInfo = {
             "id": 0,
             "runtime": 1.0,
+            "name": "job_0",
             "files": {
                 "file1.txt": {"size": 1024, "link": "output"},
                 "file2.txt": {"size": 2048, "link": "output"},
@@ -30,6 +31,7 @@ class TestCalculateDataTransferSize:
         child_job: JobInfo = {
             "id": 1,
             "runtime": 1.0,
+            "name": "job_1",
             "files": {
                 "file3.txt": {"size": 512, "link": "input"},
                 "file4.txt": {"size": 1024, "link": "input"},
@@ -44,6 +46,7 @@ class TestCalculateDataTransferSize:
         parent_job: JobInfo = {
             "id": 0,
             "runtime": 1.0,
+            "name": "job_0",
             "files": {
                 "shared.txt": {"size": 1024, "link": "output"},
                 "parent_only.txt": {"size": 2048, "link": "output"},
@@ -52,6 +55,7 @@ class TestCalculateDataTransferSize:
         child_job: JobInfo = {
             "id": 1,
             "runtime": 1.0,
+            "name": "job_1",
             "files": {
                 "shared.txt": {"size": 1024, "link": "input"},  # 大小相同
                 "child_only.txt": {"size": 512, "link": "input"},
@@ -66,6 +70,7 @@ class TestCalculateDataTransferSize:
         parent_job: JobInfo = {
             "id": 0,
             "runtime": 1.0,
+            "name": "job_0",
             "files": {
                 "shared.txt": {"size": 2048, "link": "output"},  # 父节点输出大小
                 "parent_only.txt": {"size": 1024, "link": "output"},
@@ -74,6 +79,7 @@ class TestCalculateDataTransferSize:
         child_job: JobInfo = {
             "id": 1,
             "runtime": 1.0,
+            "name": "job_1",
             "files": {
                 "shared.txt": {"size": 1024, "link": "input"},  # 子节点输入大小不同
                 "child_only.txt": {"size": 512, "link": "input"},
@@ -88,6 +94,7 @@ class TestCalculateDataTransferSize:
         parent_job: JobInfo = {
             "id": 0,
             "runtime": 1.0,
+            "name": "job_0",
             "files": {
                 "file1.txt": {"size": 1024, "link": "output"},
                 "file2.txt": {"size": 2048, "link": "output"},
@@ -97,6 +104,7 @@ class TestCalculateDataTransferSize:
         child_job: JobInfo = {
             "id": 1,
             "runtime": 1.0,
+            "name": "job_1",
             "files": {
                 "file1.txt": {"size": 1024, "link": "input"},
                 "file2.txt": {"size": 2048, "link": "input"},
@@ -109,8 +117,8 @@ class TestCalculateDataTransferSize:
 
     def test_empty_files(self):
         """测试空文件列表的情况"""
-        parent_job: JobInfo = {"id": 0, "runtime": 1.0, "files": {}}
-        child_job: JobInfo = {"id": 1, "runtime": 1.0, "files": {}}
+        parent_job: JobInfo = {"id": 0, "runtime": 1.0, "name": "job_0", "files": {}}
+        child_job: JobInfo = {"id": 1, "runtime": 1.0, "name": "job_1", "files": {}}
 
         result = calculate_data_transfer_size(parent_job, child_job)
         assert result == 0
@@ -120,6 +128,7 @@ class TestCalculateDataTransferSize:
         parent_job: JobInfo = {
             "id": 0,
             "runtime": 1.0,
+            "name": "job_0",
             "files": {
                 "file1.txt": {"size": 1024, "link": "input"},  # 只有输入文件
             },
@@ -127,6 +136,7 @@ class TestCalculateDataTransferSize:
         child_job: JobInfo = {
             "id": 1,
             "runtime": 1.0,
+            "name": "job_1",
             "files": {
                 "file1.txt": {"size": 1024, "link": "input"},
             },
@@ -140,6 +150,7 @@ class TestCalculateDataTransferSize:
         parent_job: JobInfo = {
             "id": 0,
             "runtime": 1.0,
+            "name": "job_0",
             "files": {
                 "file1.txt": {"size": 1024, "link": "output"},
             },
@@ -147,6 +158,7 @@ class TestCalculateDataTransferSize:
         child_job: JobInfo = {
             "id": 1,
             "runtime": 1.0,
+            "name": "job_1",
             "files": {
                 "file1.txt": {"size": 1024, "link": "output"},  # 只有输出文件
             },
@@ -187,8 +199,10 @@ class TestParseDAX:
         for node in data["nodes"]:
             assert "id" in node
             assert "runtime" in node
+            assert "name" in node
             assert isinstance(node["id"], int)
             assert isinstance(node["runtime"], (int, float))
+            assert isinstance(node["name"], str)
 
         # 验证边数据结构
         for edge in data["edges"]:
