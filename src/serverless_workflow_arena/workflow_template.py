@@ -32,7 +32,7 @@ class WorkflowTemplate:
         if single_core_speed <= 0:
             raise ValueError(f"Single core speed must be positive: {single_core_speed}")
         if single_core_speed < 100:
-            print(f"Warning: single core speed is recommended to be not less than 100")
+            print("Warning: single core speed is recommended to be not less than 100")
 
         dag_path = parse_dax(dax_path)
         memory_path = generate_memory_requirements(dax_path)
