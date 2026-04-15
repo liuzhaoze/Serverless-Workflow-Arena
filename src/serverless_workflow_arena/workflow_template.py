@@ -6,8 +6,20 @@ serverless工作流模板
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypedDict
 
-from .tools import generate_memory_requirements, generate_parallelisms, parse_dax
+from .tools.dax_parser import EdgeInfo, NodeInfo, parse_dax
+from .tools.pretty_json import pretty_json_dump
+
+DEFAULT_PARALLELISM = 1
+DEFAULT_MEMORY_REQ = 128
+
+
+class JsonContent(TypedDict):
+    nodes: list[NodeInfo]
+    edges: list[EdgeInfo]
+    parallelisms: list[dict[str, int]]
+    memory_reqs: list[dict[str, int]]
 
 
 @dataclass(slots=True)
@@ -23,6 +35,8 @@ class WorkflowTemplate:
 
     memory_reqs: tuple[int, ...]
     parallelisms: tuple[int, ...]
+    names: tuple[str, ...]
+    runtimes: tuple[float, ...]
     computations: tuple[int, ...]
     edges: tuple[tuple[int, int, int], ...]
 
@@ -32,45 +46,72 @@ class WorkflowTemplate:
         if single_core_speed <= 0:
             raise ValueError(f"Single core speed must be positive: {single_core_speed}")
         if single_core_speed < 100:
-            print(f"Warning: single core speed is recommended to be not less than 100")
+            print("Warning: single core speed is recommended to be not less than 100")
 
-        dag_path = parse_dax(dax_path)
-        memory_path = generate_memory_requirements(dax_path)
-        parallelism_path = generate_parallelisms(dax_path)
+        json_path = Path(dax_path).with_suffix(".json")
 
-        # 读取内存需求
-        with open(memory_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        memory_reqs = data["memory_reqs"]
-        memory_reqs_sorted = sorted(memory_reqs, key=lambda x: x["id"])
+        if json_path.exists():
+            print(f"检测到已解析的 JSON 文件：{json_path}，直接从 JSON 文件加载工作流模板")
+            self._load_from_json(str(json_path), single_core_speed)
+        else:
+            print(f"从 DAX 文件解析工作流模板：{dax_path}，并使用默认并行度和内存需求")
+            self._load_from_dax(dax_path, single_core_speed)
+
+    def _load_from_dax(self, dax_path: str, single_core_speed: int):
+        dag_info = parse_dax(dax_path)
+        nodes_sorted = sorted(dag_info["nodes"], key=lambda x: x["id"])
+        for index, item in enumerate(nodes_sorted):
+            if item["id"] != index:
+                raise ValueError(f"DAG node ID not continuous: expected {index}, got {item['id']}")
+
+        self.memory_reqs = tuple(DEFAULT_MEMORY_REQ for _ in nodes_sorted)
+        self.parallelisms = tuple(DEFAULT_PARALLELISM for _ in nodes_sorted)
+        self.names = tuple(node["name"] for node in nodes_sorted)
+        self.runtimes = tuple(node["runtime"] for node in nodes_sorted)
+        self.computations = tuple(
+            int(round(r * single_core_speed * p)) for r, p in zip(self.runtimes, self.parallelisms)
+        )
+        self.edges = tuple((edge["parent"], edge["child"], edge["size_bytes"]) for edge in dag_info["edges"])
+
+    def _load_from_json(self, json_path: str, single_core_speed: int):
+        with open(json_path, "r", encoding="utf-8") as f:
+            data: JsonContent = json.load(f)
+
+        # 验证并读取内存需求
+        memory_reqs_sorted = sorted(data["memory_reqs"], key=lambda x: x["id"])
         for index, item in enumerate(memory_reqs_sorted):
             if item["id"] != index:
                 raise ValueError(f"Memory requirements ID not continuous: expected {index}, got {item['id']}")
         self.memory_reqs = tuple(item["value"] for item in memory_reqs_sorted)
 
-        # 读取并行度
-        with open(parallelism_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        parallelisms = data["parallelisms"]
-        parallelisms_sorted = sorted(parallelisms, key=lambda x: x["id"])
+        # 验证并读取并行度
+        parallelisms_sorted = sorted(data["parallelisms"], key=lambda x: x["id"])
         for index, item in enumerate(parallelisms_sorted):
             if item["id"] != index:
                 raise ValueError(f"Parallelisms ID not continuous: expected {index}, got {item['id']}")
         self.parallelisms = tuple(item["value"] for item in parallelisms_sorted)
 
-        # 读取DAG信息
-        with open(dag_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        nodes = data["nodes"]
-        nodes_sorted = sorted(nodes, key=lambda x: x["id"])
+        # 验证并读取DAG信息
+        nodes_sorted = sorted(data["nodes"], key=lambda x: x["id"])
         for index, item in enumerate(nodes_sorted):
             if item["id"] != index:
                 raise ValueError(f"DAG node ID not continuous: expected {index}, got {item['id']}")
 
-        if not (len(nodes) == len(self.memory_reqs) == len(self.parallelisms)):
+        if not (len(nodes_sorted) == len(self.memory_reqs) == len(self.parallelisms)):
             raise ValueError("Number of nodes in DAG JSON does not match length of memory_reqs and parallelisms")
 
+        self.names = tuple(node["name"] for node in nodes_sorted)
+        self.runtimes = tuple(node["runtime"] for node in nodes_sorted)
         self.computations = tuple(
-            int(round(n["runtime"] * single_core_speed * p)) for n, p in zip(nodes_sorted, self.parallelisms)
+            int(round(r * single_core_speed * p)) for r, p in zip(self.runtimes, self.parallelisms)
         )
         self.edges = tuple((edge["parent"], edge["child"], edge["size_bytes"]) for edge in data["edges"])
+
+    def save_to_json(self, json_path: str):
+        pretty_json_dump(
+            path=json_path,
+            nodes=[{"id": i, "runtime": r, "name": n} for i, (r, n) in enumerate(zip(self.runtimes, self.names))],
+            edges=[{"parent": p, "child": c, "size_bytes": s} for p, c, s in self.edges],
+            parallelisms=[{"id": i, "value": p} for i, p in enumerate(self.parallelisms)],
+            memory_reqs=[{"id": i, "value": m} for i, m in enumerate(self.memory_reqs)],
+        )

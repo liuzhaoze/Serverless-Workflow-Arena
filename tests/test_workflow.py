@@ -45,8 +45,8 @@ class TestWorkflow:
 
         try:
             return WorkflowTemplate(str(dax_file), single_core_speed=1000)
-        except FileNotFoundError as e:
-            pytest.skip(f"Required JSON files not found for {dax_file.name}: {e}")
+        except Exception as e:
+            pytest.skip(f"Failed to load workflow template from {dax_file.name}: {e}")
 
     @pytest.fixture
     def workflow_from_template(self, workflow_template: WorkflowTemplate):

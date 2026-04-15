@@ -1,6 +1,6 @@
 [project]
 name = "serverless-workflow-arena"
-version = "1.0.0"
+version = "1.0.2"
 description = "A simulation framework for workflow resource allocation in serverless computing environments."
 readme = "README.md"
 authors = [
@@ -17,7 +17,7 @@ dependencies = [
 requires = ["uv_build>=0.8.17,<0.9.0"]
 build-backend = "uv_build"
 
-[tool.black]
+[tool.ruff]
 line-length = 120
 
 [[tool.uv.index]]
