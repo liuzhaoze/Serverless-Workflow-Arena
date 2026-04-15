@@ -1,6 +1,6 @@
 """dax_parser.py
 
-解析 Pegasus DAX 文件，将其导出为 JSON 文件：
+解析 Pegasus DAX 文件，生成如下字典：
 
 {
     "nodes": [
@@ -21,6 +21,8 @@
 - size_bytes = 父节点输出 & 子节点输入的共同文件 size 之和 (单位：字节)
 """
 
+import xml.etree.ElementTree as ET
+from pathlib import Path
 from typing import Literal, TypedDict, cast
 
 LinkType = Literal["input", "output"]
@@ -55,31 +57,17 @@ class DagInfo(TypedDict):
     edges: list[EdgeInfo]
 
 
-import xml.etree.ElementTree as ET
-from pathlib import Path
-
-from .pretty_json import pretty_json_dump
-
-
-def parse_dax(path: str) -> str:
-    """解析 DAX 文件并在同目录下对应的 JSON 文件
-
-    如果 JSON 文件已存在，则跳过解析。
+def parse_dax(path: str) -> DagInfo:
+    """解析 DAX 文件并返回 DAG 信息
 
     Args:
         path (str): DAX 文件路径
 
     Returns:
-        str: 生成的 DAG JSON 文件路径
+        DagInfo: 解析得到的 DAG 信息
     """
 
-    dax_path: Path = Path(path)
-    print(f"Parsing DAX file: {dax_path}")
-
-    json_path = dax_path.with_suffix(".dag.json")
-    if json_path.exists():
-        print(f"JSON file already exists: {json_path}, skipping parsing.")
-        return str(json_path)
+    dax_path = Path(path)
 
     tree = ET.parse(dax_path)
     root = tree.getroot()
@@ -153,13 +141,7 @@ def parse_dax(path: str) -> str:
     # 按 ID 排序
     result["nodes"].sort(key=lambda x: x["id"])
     result["edges"].sort(key=lambda x: (x["parent"], x["child"]))
-
-    # 写入 JSON 文件
-    pretty_json_dump(str(json_path), nodes=result["nodes"], edges=result["edges"])
-
-    print(f"Found {len(result['nodes'])} jobs and {len(result['edges'])} dependencies")
-    print(f"Generated JSON file: {json_path}")
-    return str(json_path)
+    return result
 
 
 def calculate_data_transfer_size(parent_job: JobInfo, child_job: JobInfo) -> int:

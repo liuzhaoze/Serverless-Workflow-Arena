@@ -1,6 +1,6 @@
 [project]
 name = "serverless-workflow-arena"
-version = "1.0.1"
+version = "1.0.2"
 description = "A simulation framework for workflow resource allocation in serverless computing environments."
 readme = "README.md"
 authors = [
