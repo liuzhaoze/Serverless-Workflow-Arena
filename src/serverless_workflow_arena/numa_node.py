@@ -148,13 +148,11 @@ class NumaNode:
         # 更新当前时间到该容器完成时间
         self._current_time = completion_time
 
-        # 检查等待队列中的容器，在剩余内存足够的情况下尽可能多地运行它们
-        started_containers_count = self._run_waiting_containers(self._current_time)
+        # 更新该容器完成后所有容器的完成时间
+        self._update_completion_times()
 
-        # 更新新容器运行后所有容器的完成时间
-        if started_containers_count > 0:
-            # 有新容器运行时才需要更新完成时间，否则不用更新，节省计算开销
-            self._update_completion_times()
+        # 容器完成后会释放内存资源，尝试从等待队列中取出容器运行
+        self._run_waiting_containers(self._current_time)
 
         return container
 
@@ -208,7 +206,6 @@ class NumaNode:
 
         # 迭代处理容器执行结束和容器开始执行事件，直到所有容器都完成
         while True:
-
             # 计算单个并行度的执行速度
             if total_parallelism <= self.cpu:
                 single_parallelism_speed = self.single_core_speed
@@ -323,36 +320,34 @@ class NumaNode:
             completed_computation = self._esm.get_computation_until(c.wf_id, c.fn_id, time)
             c.remaining_computation -= completed_computation
 
-    def _run_waiting_containers(self, time: float) -> int:
+    def _run_waiting_containers(self, time: float):
         """不断地从等待队列中取出容器运行，直到内存不足以运行下一个容器为止
 
         Args:
-            time (float): 从队列中取出容器运行的时间
-
-        Returns:
-            int: 从队列中取出容器运行的数量
+            time (float): 容器完成事件的时间
         """
-
-        count = 0
-
-        r = self._rum.get_record_at(time)
-        free_memory = r.free_memory
 
         while not self._waiting_containers.empty():
             with self._waiting_containers.mutex:
                 c: Container = self._waiting_containers.queue[0]
-            if free_memory < c.memory_alloc:
+
+            # 根据 on_container_creation 方法中的注释对容器创建时间计算方法的说明
+            # 容器的创建时间可能会因为冷启动和数据传输晚于当前容器完成事件的时间
+            # 所以容器的实际启动时间是两者中较晚的时间
+            start_time = max(time, c.creation_time)
+
+            # 检查容器启动时内存是否足够，如果不够则停止尝试启动容器
+            r = self._rum.get_record_at(start_time)
+            if r.free_memory < c.memory_alloc:
                 break
 
+            # 剩余内存足够，取出容器运行
             container = self._waiting_containers.get()
-
-            container.run(time)
+            container.run(start_time)
             self._running_containers.append(container)
 
-            free_memory -= container.memory_alloc
-            count += 1
-
-        return count
+            # 新容器运行后更新所有容器的完成时间，同时也会更新剩余内存记录
+            self._update_completion_times()
 
     def get_earliest_finished(self) -> tuple[int | None, float]:
         """获得最早完成的容器的索引和完成时间
